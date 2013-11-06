@@ -31,6 +31,12 @@ service node['nfs']['service']['server'] do
   supports :status => true
 end
 
+# Create empty exports file if missing
+file '/etc/exports' do
+  content ''
+  action :create_if_missing
+end
+
 # Configure nfs-server components
 template node['nfs']['config']['server_template'] do
   mode 0644
