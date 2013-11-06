@@ -18,59 +18,51 @@
 #
 
 action :create do
+  ro_rw = new_resource.writeable ? "rw" : "ro"
+  sync_async = new_resource.sync ? "sync" : "async"
 
-  cached_new_resource = new_resource
-  cached_new_resource = current_resource
+  if new_resource.anonuser
+    new_resource.options << "anonuid=#{find_uid(new_resource.anonuser)}"
+  end
 
-  sub_run_context = @run_context.dup
-  sub_run_context.resource_collection = Chef::ResourceCollection.new
+  if new_resource.anongroup
+    new_resource.options << "anongid=#{find_gid(new_resource.anongroup)}"
+  end
 
-  begin
-    original_run_context, @run_context = @run_context, sub_run_context
+  options = new_resource.options.join(',')
+  options = ",#{options}" unless options.empty?
 
-    ro_rw = new_resource.writeable ? "rw" : "ro"
-    sync_async = new_resource.sync ? "sync" : "async"
-    if new_resource.anonuser
-      new_resource.options << "anonuid=#{find_uid(new_resource.anonuser)}"
-    end
-    if new_resource.anongroup
-      new_resource.options << "anongid=#{find_gid(new_resource.anongroup)}"
-    end
-    options = new_resource.options.join(',')
-    options = ",#{options}" unless options.empty?
+  export_line = "#{new_resource.directory} #{new_resource.network}(#{ro_rw},#{sync_async}#{options})\n"
 
-    export_line = "#{new_resource.directory} #{new_resource.network}(#{ro_rw},#{sync_async}#{options})\n"
+  execute "exportfs" do
+    command "exportfs -ar"
+    action :nothing
+  end
 
-    execute "exportfs" do
-      command "exportfs -ar"
+  if ::File.zero? '/etc/exports' or not ::File.exists? '/etc/exports'
+    r = file '/etc/exports' do
+      content export_line
+      if node['platform'] == 'freebsd'
+      notifies :restart, "service[#{node['nfs']['service']['server']}]"
+      else notifies :run, "execute[exportfs]"
+      end
       action :nothing
     end
-
-    if ::File.zero? '/etc/exports' or not ::File.exists? '/etc/exports'
-      file '/etc/exports' do
-        content export_line
-        notifies :run, "execute[exportfs]", :immediately
+    r.run_action(:create)
+  else
+    r = append_if_no_line "export #{new_resource.name}" do
+      path "/etc/exports"
+      line export_line
+      if node['platform'] == 'freebsd'
+      notifies :restart, "service[#{node['nfs']['service']['server']}]"
+      else notifies :run, "execute[exportfs]"
       end
-    else
-      append_if_no_line "export #{new_resource.name}" do
-        path "/etc/exports"
-        line export_line
-        notifies :run, "execute[exportfs]", :immediately
-      end
+      action :nothing
     end
-  ensure
-    @run_context = original_run_context
+    r.run_action(:edit)
   end
-
-  # converge
-  begin
-    Chef::Runner.new(sub_run_context).converge
-  ensure
-    if sub_run_context.resource_collection.any?(&:updated?)
-      new_resource.updated_by_last_action(true)
-    end
-  end
-
+  
+  new_resource.updated_by_last_action(true) if r.updated_by_last_action?
 end
 
 private
@@ -80,14 +72,14 @@ private
 # @param [String] username
 # @return
 def find_uid(username)
-  uid = nil
-  Etc.passwd do |entry|
-    if entry.name == username
-      uid = entry.uid
-      break
-    end
+uid = nil
+Etc.passwd do |entry|
+  if entry.name == username
+    uid = entry.uid
+    break
   end
-  uid
+end
+uid
 end
 
 # Finds the GID for the given group name
@@ -95,12 +87,12 @@ end
 # @param [String] groupname
 # @return [Integer] the matching GID or nil
 def find_gid(groupname)
-  gid = nil
-  Etc.group do |entry|
-    if entry.name == groupname
-      gid = entry.gid
-      break
-    end
+gid = nil
+Etc.group do |entry|
+  if entry.name == groupname
+    gid = entry.gid
+    break
   end
-  gid
+end
+gid
 end
