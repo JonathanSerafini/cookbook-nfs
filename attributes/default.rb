@@ -49,14 +49,14 @@ when 'rhel'
 when 'freebsd'
   # Packages are installed by default
   default['nfs']['packages'] = []
-  default['nfs']['server_template'] = '/etc/rc.conf.d/nfs-server'
-  default['nfs']['client_templates'] = %w{
-    /etc/rc.conf.d/mountd /etc/rc.conf.d/nfsd
-  }
-  default['nfs']['service']['portmap'] = "rpcbind"
   default['nfs']['service']['lock'] = "lockd"
   default['nfs']['service']['server'] = "nfsd"
 
+  default['nfs']['config']['client_templates'] = %w{
+    /etc/rc.conf.d/mountd /etc/rc.conf.d/nfsclient
+  }
+  default['nfs']['config']['server_template'] = '/etc/rc.conf.d/nfsd'
+  default['nfs']['service']['portmap'] = "rpcbind"
   default['nfs']['config']['mountd'] = '-r'
   default['nfs']['config']['nfs'] = '-u -t -n 24'
 
