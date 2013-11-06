@@ -36,6 +36,7 @@ default['nfs']['service']['lock'] = "nfslock"
 default['nfs']['service']['server'] = "nfs"
 default['nfs']['config']['client_templates'] = %w{ /etc/sysconfig/nfs }
 default['nfs']['config']['server_template'] = "/etc/sysconfig/nfs"
+default['nfs']['exports'] = []
 
 case node['platform_family']
 
